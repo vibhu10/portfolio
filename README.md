@@ -1,3 +1,3 @@
-# Portfolio
+# Vibhu Portfolio
 
-Personal portfolio website built with Next.js and deployed via GitHub Pages.
+Live portfolio website. Enable GitHub Pages from the `main` branch and `/ (root)` folder in repository Settings → Pages.
