@@ -1,2 +1,2 @@
-import Portfolio from './PortfolioFixed';
-export default function Home(){return <Portfolio/>}
+import PortfolioReference from './PortfolioReference';
+export default function Home(){return <PortfolioReference/>}
