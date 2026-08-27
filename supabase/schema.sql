@@ -42,9 +42,9 @@ create table if not exists public.visitor_events (
   created_at timestamptz not null default now()
 );
 
--- Team access request + RBAC tables
 create table if not exists public.access_requests (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid,
   full_name text not null,
   email text not null,
   phone text,
@@ -62,9 +62,9 @@ create table if not exists public.access_requests (
   reviewed_at timestamptz,
   reviewed_by uuid references auth.users(id)
 );
+alter table public.access_requests add column if not exists user_id uuid;
 
-create unique index if not exists access_requests_email_pending_idx
-  on public.access_requests(lower(email)) where status='pending';
+create unique index if not exists access_requests_email_pending_idx on public.access_requests(lower(email)) where status='pending';
 
 create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -110,11 +110,10 @@ create policy "public read visible projects" on public.projects for select to an
 drop policy if exists "public read visible skills" on public.skills;
 create policy "public read visible skills" on public.skills for select to anon, authenticated using (visible = true or auth.role() = 'authenticated');
 
--- Any public portfolio visitor may write anonymous analytics events.
 drop policy if exists "public insert analytics" on public.visitor_events;
 create policy "public insert analytics" on public.visitor_events for insert to anon, authenticated with check (length(visitor_id) between 8 and 100 and length(event_type) between 1 and 80);
 
--- Public may submit an access request; only authenticated users may review it.
+-- Access requests. Passwords are handled only by Supabase Auth and are never stored here.
 drop policy if exists "public submit access request" on public.access_requests;
 create policy "public submit access request" on public.access_requests for insert to anon, authenticated with check (status='pending' and length(full_name) between 2 and 120 and position('@' in email) > 1);
 
@@ -124,18 +123,14 @@ create policy "authenticated read access requests" on public.access_requests for
 drop policy if exists "authenticated update access requests" on public.access_requests;
 create policy "authenticated update access requests" on public.access_requests for update to authenticated using (true) with check (true);
 
--- Profiles: authenticated users can read team records; users can update themselves.
+-- Team profiles.
 drop policy if exists "authenticated read profiles" on public.profiles;
 create policy "authenticated read profiles" on public.profiles for select to authenticated using (true);
 
-drop policy if exists "self update profile" on public.profiles;
-create policy "self update profile" on public.profiles for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-
--- Admin dashboard can insert/update team profiles after auth account exists.
 drop policy if exists "authenticated manage profiles" on public.profiles;
 create policy "authenticated manage profiles" on public.profiles for all to authenticated using (true) with check (true);
 
--- Activity log: authenticated users may write; authenticated users may read.
+-- Activity log.
 drop policy if exists "authenticated read activity" on public.activity_logs;
 create policy "authenticated read activity" on public.activity_logs for select to authenticated using (true);
 
@@ -155,13 +150,16 @@ create policy "authenticated read analytics" on public.visitor_events for select
 drop policy if exists "authenticated delete analytics" on public.visitor_events;
 create policy "authenticated delete analytics" on public.visitor_events for delete to authenticated using (true);
 
--- Public Supabase Storage bucket used for project screenshots, profile photo and resume.
+-- Public Supabase Storage bucket used for project screenshots, profile photo, avatars and resume.
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
 values ('portfolio','portfolio',true,10485760,array['image/jpeg','image/png','image/webp','image/gif','application/pdf'])
 on conflict (id) do update set public=true,file_size_limit=10485760,allowed_mime_types=excluded.allowed_mime_types;
 
 drop policy if exists "public read portfolio assets" on storage.objects;
 create policy "public read portfolio assets" on storage.objects for select to anon, authenticated using (bucket_id='portfolio');
+
+drop policy if exists "public upload access avatars" on storage.objects;
+create policy "public upload access avatars" on storage.objects for insert to anon, authenticated with check (bucket_id='portfolio' and name like 'access/%');
 
 drop policy if exists "authenticated upload portfolio assets" on storage.objects;
 create policy "authenticated upload portfolio assets" on storage.objects for insert to authenticated with check (bucket_id='portfolio');
