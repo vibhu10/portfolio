@@ -3,10 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// The public portfolio uses Supabase's publishable/anon key in the browser.
-// Database/storage access is protected by Supabase Row Level Security policies.
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+// These public values are supplied by GitHub Actions at build time.
+// Supabase RLS remains responsible for authorization and data protection.
+export const supabase = createClient(
+  supabaseUrl as string,
+  supabaseAnonKey as string,
+);
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
