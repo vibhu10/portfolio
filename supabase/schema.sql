@@ -42,6 +42,28 @@ create table if not exists public.visitor_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.site_content (
+  id integer primary key default 1 check (id=1),
+  display_name text not null default 'Kumar Vibhu',
+  short_name text not null default 'Vibhu',
+  headline text not null default 'I build modern, responsive and high-performance web products.',
+  hero_text text not null default 'Full-Stack Developer focused on production-ready applications, APIs, automation and data-driven platforms — from interface to infrastructure.',
+  role_title text not null default 'Full-Stack Developer',
+  location text not null default 'India · Remote',
+  email text not null default 'kumar.vibhu.id@gmail.com',
+  phone text not null default '+91 98163 99109',
+  github_url text not null default 'https://github.com/vibhu10',
+  linkedin_url text not null default '',
+  portfolio_url text not null default 'https://vibhu10.github.io/portfolio/',
+  about_one text not null default 'I build production web applications and enjoy owning the complete engineering flow: translating requirements into interfaces, designing APIs and data models, integrating external services, automating repetitive work and shipping applications to the cloud.',
+  about_two text not null default 'My strongest stack is JavaScript/TypeScript with React, Next.js and Node.js, plus Python/FastAPI, browser automation and modern databases when the product needs them.',
+  contact_heading text not null default 'Let’s build something useful.',
+  contact_text text not null default 'I’m open to full-stack, React/Next.js and product engineering opportunities.',
+  experience_years text not null default '3+',
+  footer_text text not null default '© 2026 Kumar Vibhu · Built with Next.js + Supabase',
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.access_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid,
@@ -99,6 +121,7 @@ create index if not exists activity_logs_created_at_idx on public.activity_logs(
 alter table public.projects enable row level security;
 alter table public.skills enable row level security;
 alter table public.visitor_events enable row level security;
+alter table public.site_content enable row level security;
 alter table public.access_requests enable row level security;
 alter table public.profiles enable row level security;
 alter table public.activity_logs enable row level security;
@@ -109,6 +132,12 @@ create policy "public read visible projects" on public.projects for select to an
 
 drop policy if exists "public read visible skills" on public.skills;
 create policy "public read visible skills" on public.skills for select to anon, authenticated using (visible = true or auth.role() = 'authenticated');
+
+drop policy if exists "public read site content" on public.site_content;
+create policy "public read site content" on public.site_content for select to anon, authenticated using (true);
+
+drop policy if exists "authenticated manage site content" on public.site_content;
+create policy "authenticated manage site content" on public.site_content for all to authenticated using (true) with check (true);
 
 drop policy if exists "public insert analytics" on public.visitor_events;
 create policy "public insert analytics" on public.visitor_events for insert to anon, authenticated with check (length(visitor_id) between 8 and 100 and length(event_type) between 1 and 80);
@@ -169,6 +198,21 @@ create policy "authenticated update portfolio assets" on storage.objects for upd
 
 drop policy if exists "authenticated delete portfolio assets" on storage.objects;
 create policy "authenticated delete portfolio assets" on storage.objects for delete to authenticated using (bucket_id='portfolio');
+
+insert into public.site_content(id) values (1) on conflict (id) do nothing;
+
+-- Seed the same six projects that are shown on the public home page so they are immediately editable in Admin → Projects.
+insert into public.projects(name,category,summary,impact,role,tech,featured,visible,sort_order)
+select v.name,v.category,v.summary,v.impact,v.role,v.tech,v.featured,true,v.sort_order
+from (values
+  ('Bird''s Eye Markets','REAL ESTATE INTELLIGENCE · PRODUCTION SAAS','A property intelligence platform that combines ownership, valuation, rental, demographic and market data into structured reports and decision-ready dashboards.','Worked across frontend, backend, data enrichment, automation and deployment for a production SaaS product.',array['Built the full Next.js frontend for property search, reports and market-analysis dashboards.','Designed Node.js/Express REST APIs plus supporting Python/FastAPI services for report generation and data aggregation.','Built Python/Playwright scraping and browser-automation workflows integrating ATTOM, AirROI, Zillow, Realtor, Google Maps and analytics data.','Automated recurring data-processing jobs with n8n and webhooks.','Containerized services with Docker/Docker Compose and deployed on DigitalOcean behind Nginx.','Integrated Stripe billing and managed production credentials and deployment workflows.']::text[],array['Next.js 14','React 18','TypeScript','Tailwind CSS','Chakra UI','Node.js','Express.js','Python','FastAPI','Supabase','PostgreSQL','Playwright','n8n','Docker','Docker Compose','Nginx','DigitalOcean','Stripe']::text[],true,0),
+  ('Queflic','SOCIAL MEDIA · MOBILE APPLICATION','A social mobile application with profiles, feeds, photo/video posts and a differentiating live-photo-moment format that combines a photo with a short video clip.','Owned the backend and contributed to the React Native application, including data models and media-processing workflows.',array['Designed REST APIs for users, profiles, feeds, posts and media uploads.','Created MongoDB models for social relationships and content.','Built the media pipeline that processes and stores combined photo/video moments.','Contributed to React Native screens and cross-platform mobile flows.']::text[],array['React Native','Node.js','Express.js','MongoDB','REST APIs']::text[],false,1),
+  ('Paradise Rental','PROPERTY RENTAL MARKETPLACE','A property-rental marketplace where users browse listings, view details, book stays and manage renter or property-owner accounts.','Led development end-to-end across the customer-facing marketplace and backend services.',array['Built responsive React listing, detail and booking flows.','Developed Node.js/Express APIs for listings, bookings and authentication.','Modeled and integrated MongoDB/MySQL for property, booking and user data.','Implemented JWT authentication and protected account workflows.']::text[],array['React.js','Node.js','Express.js','MongoDB','MySQL','REST APIs','JWT Authentication']::text[],false,2),
+  ('QuickKart','E-COMMERCE · MERN','A full e-commerce storefront covering product browsing, cart, checkout, authentication and order history.','Owned the core MERN product flow from UI to API and database.',array['Built responsive product listing, cart and checkout experiences.','Developed product, user and order APIs.','Modeled product, user and order data in MongoDB.','Implemented JWT authentication and checkout/payment workflows.']::text[],array['React.js','Node.js','Express.js','MongoDB','JWT','REST APIs']::text[],false,3),
+  ('Informed.pro','PROFESSIONAL NETWORK','A professional networking product with structured profiles, connections, activity feeds and role-aware dashboards.','Focused on data-heavy UX, performance and access-controlled product experiences.',array['Built profile, feed and dashboard features.','Implemented authentication and role-based access.','Improved large-list performance using pagination and MongoDB indexing.','Integrated frontend state with backend APIs using Redux.']::text[],array['React.js','Redux','Node.js','Express.js','MongoDB']::text[],false,4),
+  ('Docintel','AI · CLINICAL RESEARCH','A clinical research application with AI-curated content, saved articles and CPD tracking.','Connected research-discovery UX, user workflows and backend APIs.',array['Built AI-curated research feed experiences.','Implemented saved articles and CPD tracking.','Developed REST APIs for content and user actions.','Created reusable responsive frontend components.']::text[],array['React.js','Node.js','Express.js','MongoDB','REST APIs']::text[],false,5)
+) as v(name,category,summary,impact,role,tech,featured,sort_order)
+where not exists (select 1 from public.projects p where lower(p.name)=lower(v.name));
 
 -- Optional starter skills. Safe to run more than once.
 insert into public.skills(category,name,sort_order,visible)
