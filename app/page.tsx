@@ -1,2 +1,4 @@
 import PortfolioReference from './PortfolioReference';
-export default function Home(){return <PortfolioReference/>}
+import PortfolioExtras from './PortfolioExtras';
+
+export default function Home(){return <><PortfolioReference/><PortfolioExtras/></>}
