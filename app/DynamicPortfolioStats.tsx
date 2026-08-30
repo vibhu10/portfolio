@@ -3,6 +3,8 @@
 import {useEffect} from 'react';
 import {supabase,isSupabaseConfigured} from '../lib/supabase';
 
+const oldTools=new Set(['VS Code','Visual Studio','Git','GitHub','GitLab','Postman','Playwright','Jest','Cypress','npm','Yarn','Vite','Webpack','Docker','Docker Compose','Kubernetes','Nginx','AWS','Azure','Google Cloud','DigitalOcean','Vercel','Netlify','Supabase','Firebase','Stripe','n8n','Figma','Jira','Slack']);
+
 function parseExperienceDate(value:string){
   if(!value)return null;
   const trimmed=value.trim();
@@ -36,12 +38,17 @@ export default function DynamicPortfolioStats(){
     const refresh=async()=>{
       const[projects,skills,experience]=await Promise.all([
         supabase.from('projects').select('id',{count:'exact',head:true}).eq('visible',true),
-        supabase.from('skills').select('id',{count:'exact',head:true}).eq('visible',true),
+        supabase.from('skills').select('name,category').eq('visible',true),
         supabase.from('experiences').select('start_date').eq('visible',true)
       ]);
       if(!active)return;
       if(typeof projects.count==='number')setStat(1,`${projects.count}+`);
-      if(typeof skills.count==='number')setStat(3,`${skills.count}+`);
+      if(skills.data){
+        const technologyCount=skills.data.filter((row:any)=>!String(row.category||'').startsWith('Tool:')&&!oldTools.has(row.name)).length;
+        setStat(3,`${technologyCount}+`);
+        const label=document.querySelector('.v2-stats > div:nth-child(3) small');
+        if(label)label.textContent='Technologies';
+      }
       const starts=(experience.data||[])
         .map(row=>parseExperienceDate(row.start_date))
         .filter((date):date is Date=>Boolean(date))
