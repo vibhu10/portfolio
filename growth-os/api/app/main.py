@@ -11,11 +11,13 @@ from app.agents.portfolio import PortfolioAgent
 from app.core.config import get_settings
 from app.core.runtime import current_user_id, db
 from app.models.contracts import AgentCommand, ApplicationDraftRequest, ApprovalDecision, JobSearchRequest, LeadSearchRequest
+from app.routes.extended import router as extended_router
 from app.services.job_search import JobSearchService
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version='0.1.0')
 app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
+app.include_router(extended_router)
 
 class InboxSyncRequest(BaseModel):
     query: str = 'newer_than:7d'
@@ -140,7 +142,7 @@ def decide_approval(approval_id: str, decision: ApprovalDecision, user_id: str =
         action = rows[0]['action_type']
         note = 'Approved and ready for connector execution.'
         if action in ('job_submit','lead_outreach','email_reply','followup_send'):
-            note += ' No external action is executed by this endpoint; execution requires a supported connector and a separate execute call.'
+            note += ' Execution still requires the explicit execute endpoint and a supported connector.'
     else:
         note = f"Approval marked {decision.status}."
     return {'approval': result[0] if result else None, 'note': note}
