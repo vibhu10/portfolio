@@ -1,0 +1,37 @@
+{
+  "name": "Growth OS - Gmail Inbox Sync",
+  "nodes": [
+    {
+      "parameters": {"rule": {"interval": [{"field": "hours", "hoursInterval": 1}] }},
+      "id": "schedule",
+      "name": "Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-500, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.GROWTH_OS_API_URL + '/api/v1/inbox/sync'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{'Bearer ' + $env.GROWTH_OS_USER_JWT}}"}, {"name": "Content-Type", "value": "application/json"}]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"query\":\"newer_than:2d\"}",
+        "options": {"timeout": 120000}
+      },
+      "id": "sync",
+      "name": "Sync Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-150, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {"Hourly": {"main": [[{"node": "Sync Gmail", "type": "main", "index": 0}]]}},
+  "settings": {"executionOrder": "v1"},
+  "active": false,
+  "versionId": "00000000-0000-4000-8000-000000000003"
+}
