@@ -10,7 +10,8 @@ export async function api<T=any>(path:string,init:RequestInit={}):Promise<T>{
  if(!token)throw new Error('Not authenticated');
  const headers=new Headers(init.headers||{});
  headers.set('Authorization',`Bearer ${token}`);
- if(init.body&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
+ const isForm=typeof FormData!=='undefined'&&init.body instanceof FormData;
+ if(init.body&&!isForm&&!headers.has('Content-Type'))headers.set('Content-Type','application/json');
  const response=await fetch(`${API}${path}`,{...init,headers,cache:'no-store'});
  const payload=await response.json().catch(()=>({detail:`HTTP ${response.status}`}));
  if(!response.ok)throw new Error(payload.detail||payload.error||`Request failed (${response.status})`);
