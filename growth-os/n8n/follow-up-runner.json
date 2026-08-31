@@ -1,0 +1,34 @@
+{
+  "name": "Growth OS - Follow-up Runner",
+  "nodes": [
+    {
+      "parameters": {"rule": {"interval": [{"field": "hours", "hoursInterval": 6}] }},
+      "id": "schedule",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-500, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.GROWTH_OS_API_URL + '/api/v1/followups/prepare-due'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Authorization", "value": "={{'Bearer ' + $env.GROWTH_OS_USER_JWT}}"}, {"name": "Content-Type", "value": "application/json"}]},
+        "options": {"timeout": 120000}
+      },
+      "id": "prepare",
+      "name": "Prepare Due Follow-ups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-160, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {"Every 6 Hours": {"main": [[{"node": "Prepare Due Follow-ups", "type": "main", "index": 0}]]}},
+  "settings": {"executionOrder": "v1"},
+  "active": false,
+  "versionId": "00000000-0000-4000-8000-000000000002"
+}
