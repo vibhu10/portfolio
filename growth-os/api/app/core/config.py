@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     environment: str = 'development'
     supabase_url: str
     supabase_service_role_key: str
+    portfolio_owner_user_id: str | None = None
     openai_api_key: str | None = None
     openai_model: str = 'gpt-5.4-mini'
     openai_embedding_model: str = 'text-embedding-3-small'
