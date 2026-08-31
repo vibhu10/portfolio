@@ -1,14 +1,16 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.agents.portfolio import PortfolioAgent
 from app.core.config import get_settings
 from app.core.runtime import current_user_id, db
 from app.models.contracts import AgentCommand
+from app.routes.resume import router as resume_router
 from app.services.approval_executor import ApprovalExecutor, UnsupportedExternalAction
 
 router=APIRouter()
+router.include_router(resume_router)
 settings=get_settings()
 
 class ProfileUpdate(BaseModel):
