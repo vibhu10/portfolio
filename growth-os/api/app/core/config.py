@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     tavily_api_key: str | None = None
     gmail_client_id: str | None = None
     gmail_client_secret: str | None = None
+    gmail_refresh_token: str | None = None
+    gmail_user_id: str = 'me'
     allowed_origins: str = 'http://localhost:3000'
     request_timeout_seconds: float = 20.0
     model_config = SettingsConfigDict(env_file='.env', case_sensitive=False, extra='ignore')
