@@ -1,7 +1,10 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.agents.application import ApplicationAgent
+from app.agents.followup import FollowUpAgent
+from app.agents.inbox import InboxAgent, ReplyAgent
 from app.agents.leads import LeadFinderAgent, OutreachAgent
 from app.agents.orchestrator import OrchestratorAgent
 from app.agents.portfolio import PortfolioAgent
@@ -13,6 +16,12 @@ from app.services.job_search import JobSearchService
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version='0.1.0')
 app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_credentials=True, allow_methods=['*'], allow_headers=['*'])
+
+class InboxSyncRequest(BaseModel):
+    query: str = 'newer_than:7d'
+
+class FollowupScheduleRequest(BaseModel):
+    days: tuple[int, int, int] = (3, 7, 12)
 
 @app.get('/health')
 def health():
@@ -39,7 +48,8 @@ def list_jobs(min_score: float = Query(0, ge=0, le=100), status: str | None = No
 @app.get('/api/v1/jobs/{job_id}')
 def job_detail(job_id: str, user_id: str = Depends(current_user_id)):
     rows = db().table('jobs').select('*,job_matches(*),applications(*,application_answers(*))').eq('id', job_id).eq('user_id', user_id).execute().data or []
-    if not rows: raise HTTPException(404, 'Job not found')
+    if not rows:
+        raise HTTPException(404, 'Job not found')
     return rows[0]
 
 @app.post('/api/v1/applications/prepare')
@@ -70,13 +80,44 @@ def list_leads(min_score: float = Query(0, ge=0, le=100), status: str | None = N
 @app.get('/api/v1/leads/{lead_id}')
 def lead_detail(lead_id: str, user_id: str = Depends(current_user_id)):
     rows = db().table('leads').select('*,companies(*),contacts(*),followups(*),emails(*)').eq('id', lead_id).eq('user_id', user_id).execute().data or []
-    if not rows: raise HTTPException(404, 'Lead not found')
+    if not rows:
+        raise HTTPException(404, 'Lead not found')
     return rows[0]
 
 @app.post('/api/v1/leads/{lead_id}/draft-outreach')
 def draft_outreach(lead_id: str, user_id: str = Depends(current_user_id)):
     try:
         return OutreachAgent(db()).draft(user_id, lead_id)
+    except PermissionError as e:
+        raise HTTPException(409, str(e))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+@app.post('/api/v1/leads/{lead_id}/schedule-followups')
+def schedule_followups(lead_id: str, request: FollowupScheduleRequest, user_id: str = Depends(current_user_id)):
+    try:
+        return FollowUpAgent(db()).schedule_for_lead(user_id, lead_id, request.days)
+    except PermissionError as e:
+        raise HTTPException(409, str(e))
+
+@app.post('/api/v1/followups/prepare-due')
+def prepare_due_followups(user_id: str = Depends(current_user_id)):
+    try:
+        return FollowUpAgent(db()).draft_due(user_id)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+@app.post('/api/v1/inbox/sync')
+async def inbox_sync(request: InboxSyncRequest, user_id: str = Depends(current_user_id)):
+    try:
+        return await InboxAgent(db()).sync(user_id, request.query)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+@app.post('/api/v1/conversations/{thread_id}/draft-reply')
+def draft_reply(thread_id: str, user_id: str = Depends(current_user_id)):
+    try:
+        return ReplyAgent(db()).draft(user_id, thread_id)
     except PermissionError as e:
         raise HTTPException(409, str(e))
     except RuntimeError as e:
@@ -90,11 +131,10 @@ def approvals(status: str = 'pending', user_id: str = Depends(current_user_id)):
 @app.patch('/api/v1/approvals/{approval_id}')
 def decide_approval(approval_id: str, decision: ApprovalDecision, user_id: str = Depends(current_user_id)):
     rows = db().table('approvals').select('*').eq('id', approval_id).eq('user_id', user_id).execute().data or []
-    if not rows: raise HTTPException(404, 'Approval not found')
-    update = {'status': decision.status, 'edited_payload': decision.edited_payload, 'decided_at': 'now()'}
-    # Supabase REST does not evaluate SQL expressions in JSON; use an ISO timestamp instead.
+    if not rows:
+        raise HTTPException(404, 'Approval not found')
     from datetime import datetime, timezone
-    update['decided_at'] = datetime.now(timezone.utc).isoformat()
+    update = {'status': decision.status, 'edited_payload': decision.edited_payload, 'decided_at': datetime.now(timezone.utc).isoformat()}
     result = db().table('approvals').update(update).eq('id', approval_id).execute().data or []
     if decision.status == 'approved':
         action = rows[0]['action_type']
@@ -155,8 +195,14 @@ def analytics(user_id: str = Depends(current_user_id)):
     positive = [x for x in emails if x.get('classification') in ('interested','interview','meeting request','pricing request')]
     meetings = [x for x in leads if x.get('status') in ('meeting','client')]
     return {
-        'jobs_discovered': len(jobs), 'strong_matches': len(matches), 'applications': len([x for x in apps if x.get('status') in ('applied','interview','rejected','offer')]),
-        'interviews': len([x for x in apps if x.get('status') == 'interview']), 'offers': len([x for x in apps if x.get('status') == 'offer']),
-        'leads_discovered': len(leads), 'emails_sent': len(outbound), 'positive_replies': len(positive), 'meetings': len(meetings),
+        'jobs_discovered': len(jobs),
+        'strong_matches': len(matches),
+        'applications': len([x for x in apps if x.get('status') in ('applied','interview','rejected','offer')]),
+        'interviews': len([x for x in apps if x.get('status') == 'interview']),
+        'offers': len([x for x in apps if x.get('status') == 'offer']),
+        'leads_discovered': len(leads),
+        'emails_sent': len(outbound),
+        'positive_replies': len(positive),
+        'meetings': len(meetings),
         'conversion_rate': round((len(positive) / len(outbound) * 100), 1) if outbound else 0,
     }
