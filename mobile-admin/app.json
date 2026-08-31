@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Vibhu Admin",
+    "slug": "vibhu-portfolio-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "vibhuadmin",
+    "android": {
+      "package": "com.vibhu.portfolioadmin"
+    },
+    "ios": {
+      "bundleIdentifier": "com.vibhu.portfolioadmin",
+      "supportsTablet": true
+    }
+  }
+}
