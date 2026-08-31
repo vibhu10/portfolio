@@ -1,0 +1,59 @@
+name: Growth OS CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'growth-os/**'
+      - 'supabase/migrations/20260831_growth_os*.sql'
+      - '.github/workflows/growth-os-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: growth-os-ci
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: growth-os/api
+    env:
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install API dependencies
+        run: pip install -r requirements.txt
+      - name: Compile Python
+        run: python -m compileall -q app
+      - name: Import FastAPI application
+        run: python -c "from app.main import app; print(app.title)"
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: growth-os/dashboard
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+      NEXT_PUBLIC_GROWTH_OS_API_URL: http://localhost:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dashboard dependencies
+        run: npm install
+      - name: Typecheck dashboard
+        run: npm run typecheck
+      - name: Build dashboard
+        run: npm run build
