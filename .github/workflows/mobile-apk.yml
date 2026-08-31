@@ -1,0 +1,54 @@
+name: Build Android Admin APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile-admin/**'
+      - '.github/workflows/mobile-apk.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-admin-apk
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile-admin
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile-admin/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        run: npm install
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --non-interactive
+      - name: Build installable debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleDebug --no-daemon
+      - name: Copy APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Vibhu-Admin.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vibhu-Admin-Android
+          path: mobile-admin/Vibhu-Admin.apk
+          retention-days: 30
