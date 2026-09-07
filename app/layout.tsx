@@ -5,6 +5,7 @@ import './profile.css';
 import './admin/admin.css';
 import './final-fixes.css';
 import './latest-upgrades.css';
+import './image-fixes.css';
 
 export const metadata: Metadata = {
   title: 'Kumar Vibhu — Full-Stack Developer',
