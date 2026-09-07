@@ -5,5 +5,6 @@ import JarvisAssistant from './JarvisAssistant';
 import PublicExperiencePolish from './PublicExperiencePolish';
 import ThemeRuntime from './ThemeRuntime';
 import NeuralJarvisSkin from './NeuralJarvisSkin';
+import PortfolioImageEnhancer from './PortfolioImageEnhancer';
 
-export default function Home(){return <><ThemeRuntime/><PortfolioReference/><DynamicPortfolioStats/><TechnologyToolsMount/><JarvisAssistant/><PublicExperiencePolish/><NeuralJarvisSkin/></>}
+export default function Home(){return <><ThemeRuntime/><PortfolioReference/><PortfolioImageEnhancer/><DynamicPortfolioStats/><TechnologyToolsMount/><JarvisAssistant/><PublicExperiencePolish/><NeuralJarvisSkin/></>}
