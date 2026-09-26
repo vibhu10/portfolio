@@ -36,3 +36,5 @@
 @media(max-width:480px){.heroV4 h2{font-size:29px}.masteryGrid article{grid-template-columns:1fr}.masteryBlocks{width:120px}.masteryGrid strong{position:absolute;right:22px}.countBody{grid-template-columns:1fr}.countNumber{font-size:52px}.plannerLower{gap:10px}}
 
 .logoutTop{height:33px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025);color:#c9ff63;padding:0 11px;font-size:8px;font-weight:800;cursor:pointer;display:flex;align-items:center}.logoutTop:hover{background:rgba(201,255,99,.07);border-color:rgba(201,255,99,.16)}
+
+.paperLinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.paperLinks a{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);font-size:9px;font-weight:800;color:#c9ff63;text-decoration:none}.paperLinks a:hover{background:rgba(201,255,99,.07);border-color:rgba(201,255,99,.16)}
