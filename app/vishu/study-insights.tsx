@@ -1,7 +1,7 @@
 'use client';
 import {useMemo} from 'react';
 import s from './vishu.module.css';
-import {questions} from './data';
+import {questions,type Q} from './data';
 import {localKey} from './study-tools';
 
 export function ExamCountdown({date,setDate}:{date:string;setDate:(v:string)=>void}){
@@ -38,8 +38,8 @@ export function SevenDayPlan({weakTopic,syllabusPct,reviewCount}:{weakTopic?:str
  return <section className={s.roadmapCard}><div className={s.cardHead}><div><span className={s.micro}>ADAPTIVE ROADMAP</span><h3>Your next 7 study days</h3></div><span className={s.aiChip}>AUTO PLAN</span></div><div className={s.roadmap}>{plan.map((x,i)=><article key={x[0]}><div className={s.dayDot}><span>{i+1}</span>{i<plan.length-1&&<i/>}</div><div><small>{x[0]}</small><b>{x[1]}</b><p>{x[2]}</p></div><em>{x[3]}</em></article>)}</div></section>
 }
 
-export function MasteryMatrix({topics}:{topics:Record<string,{a:number;c:number}>}){
- const all=Array.from(new Set(questions.map(q=>q.topic)));
+export function MasteryMatrix({topics,bank=questions}:{topics:Record<string,{a:number;c:number}>;bank?:Q[]}){
+ const all=Array.from(new Set(bank.map(q=>q.topic)));
  const rows=all.map(topic=>{const t=topics[topic]||{a:0,c:0};const acc=t.a?Math.round(t.c/t.a*100):0;const level=t.a<2?0:acc>=80?4:acc>=65?3:acc>=50?2:1;return{topic,a:t.a,acc,level}}).sort((a,b)=>a.level-b.level||b.a-a.a);
  return <section className={s.masteryCard}><div className={s.cardHead}><div><span className={s.micro}>TOPIC MASTERY</span><h3>Knowledge map</h3></div><div className={s.masteryLegend}><span>New</span><i/><i/><i/><i/></div></div><div className={s.masteryGrid}>{rows.map(r=><article key={r.topic}><div><b>{r.topic}</b><small>{r.a?r.a+' attempts':'Not tested'}</small></div><div className={s.masteryBlocks}>{[1,2,3,4].map(n=><i key={n} className={r.level>=n?s.mastered:''}/>)}</div><strong>{r.a?r.acc+'%':'—'}</strong></article>)}</div></section>
 }
