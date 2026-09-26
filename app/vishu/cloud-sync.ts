@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import type { Q } from './data';
 
 type SimpleTasks = Record<string, boolean>;
 
@@ -58,6 +59,64 @@ export async function getHasExam() {
     .single();
 
   return error ? null : data;
+}
+
+export async function loadQuestionBank(): Promise<Q[]> {
+  const exam = await getHasExam();
+  if (!exam) return [];
+
+  const [questionResult, sectionResult, topicResult] = await Promise.all([
+    supabase
+      .from('exam_questions')
+      .select('id,section_id,topic_id,external_key,question_text,options,correct_option,explanation,takeaway,source_year,source_type')
+      .eq('exam_id', exam.id)
+      .eq('active', true)
+      .not('correct_option', 'is', null)
+      .order('source_year', { ascending: false, nullsFirst: false })
+      .order('external_key', { ascending: true }),
+    supabase
+      .from('exam_sections')
+      .select('id,code')
+      .eq('exam_id', exam.id),
+    supabase
+      .from('exam_topics')
+      .select('id,name')
+      .eq('exam_id', exam.id),
+  ]);
+
+  if (questionResult.error) return [];
+
+  const sectionById = new Map(
+    (sectionResult.data || []).map((row: any) => [row.id, row.code] as const)
+  );
+  const topicById = new Map(
+    (topicResult.data || []).map((row: any) => [row.id, row.name] as const)
+  );
+
+  return (questionResult.data || []).map((row: any) => {
+    const answer = Number(row.correct_option);
+    const year = row.source_year ? Number(row.source_year) : undefined;
+    const sourceType = String(row.source_type || 'practice');
+
+    return {
+      id: String(row.external_key),
+      kind: sectionById.get(row.section_id) === 'GSAT' ? 'GSAT' : 'GS',
+      topic: topicById.get(row.topic_id) || 'General Studies',
+      q: String(row.question_text),
+      o: Array.isArray(row.options) ? row.options.map(String) : [],
+      a: answer,
+      why:
+        String(row.explanation || '') ||
+        (sourceType === 'pyq'
+          ? 'Answer key option: ' + String.fromCharCode(65 + answer) + '.'
+          : 'Review the correct option and the underlying concept.'),
+      tip:
+        String(row.takeaway || '') ||
+        (year ? 'HPAS previous year question · ' + year : 'Syllabus practice question'),
+      year,
+      sourceType,
+    } satisfies Q;
+  }).filter((q: Q) => q.o.length >= 2);
 }
 
 export async function signInStudyUser(email: string, password: string) {
