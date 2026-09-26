@@ -4,9 +4,10 @@ import s from './vishu.module.css';
 import {official,papers,questions,prelim,mains,gsPriority,gsatPriority,type Kind,type Q} from './data';
 import {ActivityHeatmap,Bookmarks,DailyMission,Flashcards,FocusTimer,QuickNotes,ReviewQueue,localKey,type DailyTasks} from './study-tools';
 import {DataVault,ExamCountdown,MasteryMatrix,SevenDayPlan,WeeklyPulse} from './study-insights';
+import {supabase} from '@/lib/supabase';
+import {signInStudyUser} from './cloud-sync';
 
-const HASH='1bb31dbdb4c1c4ebc447edad08169518435f8a40b6d0985b943a5ddf26202ce0';
-const AUTH='vishu-auth-v1',STORE='vishu-progress-v1';
+const STORE='vishu-progress-v1';
 type View='dashboard'|'planner'|'papers'|'practice'|'mock'|'syllabus'|'revision'|'analytics';
 type Progress={
  attempts:number;correct:number;topics:Record<string,{a:number;c:number}>;done:string[];
@@ -16,13 +17,12 @@ type Progress={
 };
 const blank:Progress={attempts:0,correct:0,topics:{},done:[],mocks:[],bookmarks:[],review:[],notes:'',activity:{},daily:{},examDate:'',weeklyTarget:35};
 const pct=(a:number,b:number)=>a?Math.round(b/a*100):0;
-async function hash(v:string){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 const nav:[View,string,string][]=[['dashboard','Command','⌁'],['planner','Planner','◷'],['papers','Papers','▤'],['practice','Practice','✦'],['mock','Mock','◉'],['syllabus','Syllabus','✓'],['revision','Revision Lab','↺'],['analytics','Analytics','⌁']];
 
 export default function Vishu(){
  const[ready,setReady]=useState(false),[auth,setAuth]=useState(false),[view,setView]=useState<View>('dashboard');
  const[p,setP]=useState<Progress>(blank);
- useEffect(()=>{setAuth(localStorage.getItem(AUTH)===HASH);try{const saved=JSON.parse(localStorage.getItem(STORE)||'{}');setP({...blank,...saved,topics:saved.topics||{},done:saved.done||[],mocks:saved.mocks||[],bookmarks:saved.bookmarks||[],review:saved.review||[],activity:saved.activity||{},daily:saved.daily||{}})}catch{}setReady(true)},[]);
+ useEffect(()=>{let mounted=true;async function init(){const {data:{session}}=await supabase.auth.getSession();if(!mounted)return;setAuth(Boolean(session));try{const saved=JSON.parse(localStorage.getItem(STORE)||'{}');setP({...blank,...saved,topics:saved.topics||{},done:saved.done||[],mocks:saved.mocks||[],bookmarks:saved.bookmarks||[],review:saved.review||[],activity:saved.activity||{},daily:saved.daily||{}})}catch{}setReady(true)}init();return()=>{mounted=false}},[]);
  useEffect(()=>{if(ready)localStorage.setItem(STORE,JSON.stringify(p))},[p,ready]);
  if(!ready)return <main className={s.loading}><div className={s.loader}/><span>Building your study command center…</span></main>;
  if(!auth)return <Login onOk={()=>setAuth(true)}/>;
@@ -42,7 +42,7 @@ export default function Vishu(){
    <div className={s.navLabel}>WORKSPACE</div>
    <nav>{nav.map(([id,label,icon])=><button key={id} className={view===id?s.active:''} onClick={()=>setView(id)}><span>{icon}</span><b>{label}</b>{view===id&&<i/>}</button>)}</nav>
    <div className={s.sideCard}><div><span>Overall progress</span><b>{syll}%</b></div><div className={s.bar}><i style={{width:syll+'%'}}/></div><small>{p.done.length}/{all.length} syllabus blocks complete</small></div>
-   <button className={s.lock} onClick={()=>{localStorage.removeItem(AUTH);setAuth(false)}}>↗ Lock workspace</button>
+   <button className={s.lock} onClick={async()=>{await supabase.auth.signOut();setAuth(false)}}>↗ Lock workspace</button>
   </aside>
 
   <main className={s.main}>
@@ -65,10 +65,10 @@ function calcStreak(activity:Record<string,number>){let d=new Date(),n=0;if(!(ac
 
 function Login({onOk}:{onOk:()=>void}){
  const[e,setE]=useState(''),[pw,setPw]=useState(''),[err,setErr]=useState('');
- async function submit(ev:FormEvent){ev.preventDefault();if(await hash(e.trim().toLowerCase()+'|'+pw)===HASH){localStorage.setItem(AUTH,HASH);onOk()}else setErr('Incorrect login details.')}
+ async function submit(ev:FormEvent){ev.preventDefault();setErr('');const {session,error}=await signInStudyUser(e.trim().toLowerCase(),pw);if(error||!session){setErr('Incorrect email or password.');return}onOk()}
  return <main className={s.login}><div className={s.loginGlow}/><div className={s.loginNoise}/><section className={s.loginShell}>
   <div className={s.loginIntro}><span className={s.kicker}>HAS PREPARATION · REIMAGINED</span><h1>Your exam prep.<br/><em>One intelligent system.</em></h1><p>Practice, plan, revise, track mistakes and measure consistency without jumping between apps.</p><div className={s.loginStats}><div><b>26</b><span>Years mapped</span></div><div><b>35d</b><span>Study heatmap</span></div><div><b>∞</b><span>Revision cycles</span></div></div></div>
-  <form onSubmit={submit} className={s.loginCard}><div className={s.logo}>H</div><small>VISHU STUDY OS</small><h2>Enter command center</h2><p>Your private HAS preparation workspace.</p><label>Email<input type="email" value={e} onChange={x=>setE(x.target.value)} placeholder="you@example.com" required/></label><label>Password<input type="password" value={pw} onChange={x=>setPw(x.target.value)} placeholder="••••••••••" required/></label>{err&&<b className={s.error}>{err}</b>}<button>Launch workspace <span>→</span></button><em>Local credential verification · private study data stays in this browser</em></form>
+  <form onSubmit={submit} className={s.loginCard}><div className={s.logo}>H</div><small>VISHU STUDY OS</small><h2>Enter command center</h2><p>Your private HAS preparation workspace.</p><label>Email<input type="email" value={e} onChange={x=>setE(x.target.value)} placeholder="you@example.com" required/></label><label>Password<input type="password" value={pw} onChange={x=>setPw(x.target.value)} placeholder="••••••••••" required/></label>{err&&<b className={s.error}>{err}</b>}<button>Launch workspace <span>→</span></button><em>Supabase secured authentication · local progress cache enabled</em></form>
  </section></main>
 }
 
