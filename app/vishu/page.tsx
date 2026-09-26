@@ -4,7 +4,7 @@ import s from './vishu.module.css';
 import {official,papers,questions,prelim,mains,gsPriority,gsatPriority,type Kind,type Q} from './data';
 import {ActivityHeatmap,Bookmarks,DailyMission,Flashcards,FocusTimer,QuickNotes,ReviewQueue,localKey,type DailyTasks} from './study-tools';
 import {DataVault,ExamCountdown,MasteryMatrix,SevenDayPlan,WeeklyPulse} from './study-insights';
-import {supabase} from '@/lib/supabase';
+import {supabase} from '../../lib/supabase';
 import {signInStudyUser} from './cloud-sync';
 
 const STORE='vishu-progress-v1';
