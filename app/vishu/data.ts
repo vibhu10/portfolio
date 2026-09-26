@@ -1,5 +1,5 @@
 export type Kind='GS'|'GSAT';
-export type Q={id:string;kind:Kind;topic:string;q:string;o:string[];a:number;why:string;tip:string;year?:number};
+export type Q={id:string;kind:Kind;topic:string;q:string;o:string[];a:number;why:string;tip:string;year?:number;sourceType?:string};
 export const official={
  home:'https://hppsc.hp.gov.in/',
  mains:'https://hppsc.hp.gov.in/hppsc1/WriteReadData/LINKS/Amended%20Syllabus%20of%20HPAS%20Main%20Examination2fbbc628-97dc-4a52-b27d-dee8b034408d.pdf',
