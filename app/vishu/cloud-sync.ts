@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 export async function getHasExam() {
   if (!isSupabaseConfigured) return null;
