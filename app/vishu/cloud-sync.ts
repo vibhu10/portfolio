@@ -65,15 +65,7 @@ export async function loadQuestionBank(): Promise<Q[]> {
   const exam = await getHasExam();
   if (!exam) return [];
 
-  const [questionResult, sectionResult, topicResult] = await Promise.all([
-    supabase
-      .from('exam_questions')
-      .select('id,section_id,topic_id,external_key,question_text,options,correct_option,explanation,takeaway,source_year,source_type')
-      .eq('exam_id', exam.id)
-      .eq('active', true)
-      .not('correct_option', 'is', null)
-      .order('source_year', { ascending: false, nullsFirst: false })
-      .order('external_key', { ascending: true }),
+  const [sectionResult, topicResult] = await Promise.all([
     supabase
       .from('exam_sections')
       .select('id,code')
@@ -84,7 +76,24 @@ export async function loadQuestionBank(): Promise<Q[]> {
       .eq('exam_id', exam.id),
   ]);
 
-  if (questionResult.error) return [];
+  const questionRows: any[] = [];
+  const pageSize = 1000;
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('exam_questions')
+      .select('id,section_id,topic_id,external_key,question_text,options,correct_option,explanation,takeaway,source_year,source_type')
+      .eq('exam_id', exam.id)
+      .eq('active', true)
+      .not('correct_option', 'is', null)
+      .order('source_year', { ascending: false, nullsFirst: false })
+      .order('external_key', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) return [];
+    questionRows.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
 
   const sectionById = new Map(
     (sectionResult.data || []).map((row: any) => [row.id, row.code] as const)
@@ -93,7 +102,7 @@ export async function loadQuestionBank(): Promise<Q[]> {
     (topicResult.data || []).map((row: any) => [row.id, row.name] as const)
   );
 
-  return (questionResult.data || []).map((row: any) => {
+  return questionRows.map((row: any) => {
     const answer = Number(row.correct_option);
     const year = row.source_year ? Number(row.source_year) : undefined;
     const sourceType = String(row.source_type || 'practice');
