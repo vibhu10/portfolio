@@ -8,7 +8,27 @@ export const official={
 };
 const modern=new Set([2010,2011,2013,2014,2016,2017,2018,2020,2021,2023,2024,2025]);
 const archived=new Set([2005,2006,2007,2009,2012,2015,2019,2022]);
-export const papers=Array.from({length:26},(_,i)=>{const year=2025-i;const legacy=year<2010;const status=modern.has(year)?'Verified':archived.has(year)?'Archive':'Not verified';return{year,gs:status,gsat:legacy?'N/A':status,url:status==='Verified'||status==='Archive'?official.archive:official.solved,legacy}});
+const uploadedPaperUrls:Record<number,{gsUrl?:string;gsatUrl?:string}>={
+  2025:{
+    gsUrl:'https://cdn-images.prepp.in/public/image/HPPSC_Prelims_GS_Question_Paper_2025_2834d89ecff913f573be8728ddea7615.pdf',
+    gsatUrl:'https://cdn-images.prepp.in/public/image/HPPSC_Prelims_CSAT_Question_Paper_2025_ec1ffafcad8cb54feecdbf6a9247c8f5.pdf'
+  },
+  2024:{
+    gsUrl:'https://cdn-images.prepp.in/public/image/HPAS_2024_Prelims_General_Studies_Paper_1_HP_b8bcd2e1bb6a024df2e416f465517523.pdf',
+    gsatUrl:'https://cdn-images.prepp.in/public/image/HPAS_2024_Prelims_Aptitude_Test_Paper_2_HP_9b3c930f2e1d74720af341b28ff629fb.pdf'
+  },
+  2023:{
+    gsUrl:'https://cdn-images.prepp.in/public/image/HPPSC_2023_Prelims_Paper_1_GS_Question_Paper_with_Answer_Key_Download_PDF_9ea2915b3efc0cae9fd54397ff364ac5.pdf',
+    gsatUrl:'https://cdn-images.prepp.in/public/image/HPPSC_HPAS_Prelims_Exam_Aptitude_Test_Official_Paper_II_Held_On_01_Oct_2023__7f789c7fd6a108357f382477d6ecc02a.pdf'
+  },
+  2022:{
+    gsUrl:'https://cdn-images.prepp.in/public/image/HPPSC_HPAS_16_Oct_2022_GS_Paper_I_English__2a0fa8e5aacd62ca42e4c77876c90e37.pdf'
+  }
+};
+export const papers=Array.from({length:26},(_,i)=>{
+ const year=2025-i,legacy=year<2010,status=modern.has(year)?'Verified':archived.has(year)?'Archive':'Not verified',direct=uploadedPaperUrls[year]||{};
+ return{year,gs:direct.gsUrl?'Uploaded PYQ':status,gsat:legacy?'N/A':direct.gsatUrl?'Uploaded PYQ':status,gsUrl:direct.gsUrl,gsatUrl:direct.gsatUrl,url:status==='Verified'||status==='Archive'?official.archive:official.solved,legacy}
+});
 export const gsPriority=[
  ['Himachal history, geography, culture & development',96],['HP economy, governance, schemes & current issues',92],['Indian Polity & Governance',86],['Current Affairs',84],['Indian History & National Movement',79],['Indian & World Geography',76],['Environment, Biodiversity & Climate',74],['Economy & Social Development',72],['General Science',64]
 ] as const;
