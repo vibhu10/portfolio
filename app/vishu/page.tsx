@@ -3,6 +3,7 @@ import {FormEvent,useEffect,useState} from 'react';
 import s from './vishu.module.css';
 import {official,papers,questions,prelim,mains,gsPriority,gsatPriority,type Kind,type Q} from './data';
 import {ActivityHeatmap,Bookmarks,DailyMission,Flashcards,FocusTimer,QuickNotes,ReviewQueue,localKey,type DailyTasks} from './study-tools';
+import {DataVault,ExamCountdown,MasteryMatrix,SevenDayPlan,WeeklyPulse} from './study-insights';
 
 const HASH='1bb31dbdb4c1c4ebc447edad08169518435f8a40b6d0985b943a5ddf26202ce0';
 const AUTH='vishu-auth-v1',STORE='vishu-progress-v1';
@@ -10,15 +11,13 @@ type View='dashboard'|'planner'|'papers'|'practice'|'mock'|'syllabus'|'revision'
 type Progress={
  attempts:number;correct:number;topics:Record<string,{a:number;c:number}>;done:string[];
  mocks:{date:string;kind:string;score:number}[];bookmarks:string[];review:string[];
- notes:string;activity:Record<string,number>;daily:Record<string,DailyTasks>
+ notes:string;activity:Record<string,number>;daily:Record<string,DailyTasks>;
+ examDate:string;weeklyTarget:number
 };
-const blank:Progress={attempts:0,correct:0,topics:{},done:[],mocks:[],bookmarks:[],review:[],notes:'',activity:{},daily:{}};
+const blank:Progress={attempts:0,correct:0,topics:{},done:[],mocks:[],bookmarks:[],review:[],notes:'',activity:{},daily:{},examDate:'',weeklyTarget:35};
 const pct=(a:number,b:number)=>a?Math.round(b/a*100):0;
 async function hash(v:string){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-const nav:[View,string,string][]=[
- ['dashboard','Command','⌁'],['planner','Planner','◷'],['papers','Papers','▤'],['practice','Practice','✦'],
- ['mock','Mock','◉'],['syllabus','Syllabus','✓'],['revision','Revision Lab','↺'],['analytics','Analytics','⌁']
-];
+const nav:[View,string,string][]=[['dashboard','Command','⌁'],['planner','Planner','◷'],['papers','Papers','▤'],['practice','Practice','✦'],['mock','Mock','◉'],['syllabus','Syllabus','✓'],['revision','Revision Lab','↺'],['analytics','Analytics','⌁']];
 
 export default function Vishu(){
  const[ready,setReady]=useState(false),[auth,setAuth]=useState(false),[view,setView]=useState<View>('dashboard');
@@ -30,8 +29,7 @@ export default function Vishu(){
 
  const acc=pct(p.attempts,p.correct),all=[...prelim,...mains],syll=Math.round(p.done.length/all.length*100);
  const weak=Object.entries(p.topics).filter(([,v])=>v.a>=2).map(([topic,v])=>({topic,acc:pct(v.a,v.c),n:v.a})).sort((a,b)=>a.acc-b.acc);
- const readiness=Math.round((acc+syll+(p.mocks[0]?.score||0))/3);
- const streak=calcStreak(p.activity),today=localKey(),todayTasks=p.daily[today]||{};
+ const readiness=Math.round((acc+syll+(p.mocks[0]?.score||0))/3),streak=calcStreak(p.activity),today=localKey(),todayTasks=p.daily[today]||{};
  const toggleBookmark=(id:string)=>setP(x=>({...x,bookmarks:x.bookmarks.includes(id)?x.bookmarks.filter(v=>v!==id):[...x.bookmarks,id]}));
  const addActivity=(amount=1)=>setP(x=>({...x,activity:{...x.activity,[today]:(x.activity[today]||0)+amount}}));
  const updateDaily=(tasks:DailyTasks)=>setP(x=>({...x,daily:{...x.daily,[today]:tasks},activity:{...x.activity,[today]:(x.activity[today]||0)+1}}));
@@ -50,14 +48,14 @@ export default function Vishu(){
   <main className={s.main}>
    <header className={s.topbar}><div><small>HIMACHAL PRADESH ADMINISTRATIVE SERVICE</small><h1>{title(view)}</h1></div><div className={s.topActions}><button className={s.quickBtn} onClick={()=>setView('practice')}>✦ Quick 5</button><div className={s.live}><i/> Study OS online</div><a href={official.home} target="_blank">HPPSC ↗</a></div></header>
    <div className={s.content}>
-    {view==='dashboard'&&<Dashboard p={p} acc={acc} syll={syll} weak={weak} readiness={readiness} streak={streak} setView={setView}/>}
-    {view==='planner'&&<Planner tasks={todayTasks} setTasks={updateDaily} weakTopic={weak[0]?.topic} activity={p.activity} notes={p.notes} setNotes={notes=>setP(x=>({...x,notes}))} onFocusComplete={()=>addActivity(3)}/>}
+    {view==='dashboard'&&<Dashboard p={p} acc={acc} syll={syll} weak={weak} readiness={readiness} streak={streak} setView={setView} setExamDate={examDate=>setP(x=>({...x,examDate}))} setWeeklyTarget={weeklyTarget=>setP(x=>({...x,weeklyTarget}))}/>}
+    {view==='planner'&&<Planner p={p} tasks={todayTasks} setTasks={updateDaily} weakTopic={weak[0]?.topic} syllabusPct={syll} setNotes={notes=>setP(x=>({...x,notes}))} onFocusComplete={()=>addActivity(3)} setExamDate={examDate=>setP(x=>({...x,examDate}))}/>}
     {view==='papers'&&<Papers/>}
     {view==='practice'&&<Practice bookmarks={p.bookmarks} onToggleBookmark={toggleBookmark} onAnswer={(q,ok)=>setP(x=>{const t=x.topics[q.topic]||{a:0,c:0};const review=ok?x.review:(x.review.includes(q.id)?x.review:[q.id,...x.review]);return{...x,attempts:x.attempts+1,correct:x.correct+(ok?1:0),review,topics:{...x.topics,[q.topic]:{a:t.a+1,c:t.c+(ok?1:0)}},activity:{...x.activity,[today]:(x.activity[today]||0)+1}}})}/>}
     {view==='mock'&&<Mock onDone={(kind,score)=>setP(x=>({...x,mocks:[{date:new Date().toISOString(),kind,score},...x.mocks].slice(0,20),activity:{...x.activity,[today]:(x.activity[today]||0)+5}}))}/>}
     {view==='syllabus'&&<Syllabus done={p.done} setDone={done=>setP(x=>({...x,done,activity:{...x.activity,[today]:(x.activity[today]||0)+1}}))}/>}
     {view==='revision'&&<RevisionLab p={p} toggleBookmark={toggleBookmark} removeReview={id=>setP(x=>({...x,review:x.review.filter(v=>v!==id),activity:{...x.activity,[today]:(x.activity[today]||0)+1}}))}/>}
-    {view==='analytics'&&<Analytics p={p} weak={weak} streak={streak}/>}
+    {view==='analytics'&&<Analytics p={p} weak={weak} streak={streak} setWeeklyTarget={weeklyTarget=>setP(x=>({...x,weeklyTarget}))}/>}
    </div>
   </main>
  </div>
@@ -74,15 +72,17 @@ function Login({onOk}:{onOk:()=>void}){
  </section></main>
 }
 
-function Dashboard({p,acc,syll,weak,readiness,streak,setView}:{p:Progress;acc:number;syll:number;weak:{topic:string;acc:number;n:number}[];readiness:number;streak:number;setView:(v:View)=>void}){
+function Dashboard({p,acc,syll,weak,readiness,streak,setView,setExamDate,setWeeklyTarget}:{p:Progress;acc:number;syll:number;weak:{topic:string;acc:number;n:number}[];readiness:number;streak:number;setView:(v:View)=>void;setExamDate:(x:string)=>void;setWeeklyTarget:(n:number)=>void}){
  const best=p.mocks.length?Math.max(...p.mocks.map(x=>x.score)):0;
  return <>
-  <section className={s.heroV3}><div className={s.heroMesh}/><div className={s.heroCopy}><span className={s.kicker}>GOOD MORNING · STUDY COMMAND</span><h2>Know exactly <em>what to study next.</em></h2><p>Your workspace now turns mistakes, syllabus progress, mock scores and consistency into one study loop.</p><div className={s.heroButtons}><button onClick={()=>setView('planner')}>Open today’s plan <span>→</span></button><button onClick={()=>setView('revision')}>Review {p.review.length} mistakes</button></div></div><div className={s.readinessStack}><div className={s.donut} style={{'--score':readiness} as any}><div><b>{readiness}%</b><small>READINESS</small></div></div><div className={s.signal}><i/><span><b>{weak[0]?.topic||'Diagnostic pending'}</b><small>{weak[0]?'Needs attention':'Start Smart Practice'}</small></span></div></div></section>
+  <section className={s.heroV4}><div className={s.heroMesh}/><div className={s.heroCopy}><span className={s.kicker}>PERSONAL PREP INTELLIGENCE</span><h2>Study with a system that <em>gets sharper with you.</em></h2><p>Mistakes become revision, activity becomes consistency data, and weak topics automatically influence what you should do next.</p><div className={s.heroButtons}><button onClick={()=>setView('planner')}>Open today’s plan <span>→</span></button><button onClick={()=>setView('revision')}>Review {p.review.length} mistakes</button></div></div><div className={s.readinessStack}><div className={s.donut} style={{'--score':readiness} as any}><div><b>{readiness}%</b><small>READINESS</small></div></div><div className={s.signal}><i/><span><b>{weak[0]?.topic||'Diagnostic pending'}</b><small>{weak[0]?'Priority repair zone':'Start Smart Practice'}</small></span></div></div></section>
 
   <section className={s.statRail}><article><span>🔥</span><div><small>STUDY STREAK</small><b>{streak} days</b></div></article><article><span>↺</span><div><small>REVISION QUEUE</small><b>{p.review.length} questions</b></div></article><article><span>★</span><div><small>BOOKMARKS</small><b>{p.bookmarks.length} saved</b></div></article><article><span>◉</span><div><small>BEST MOCK</small><b>{p.mocks.length?best+'%':'—'}</b></div></article><article><span>✓</span><div><small>SYLLABUS</small><b>{syll}%</b></div></article></section>
 
-  <section className={s.commandGrid}>
-   <article className={s.nextAction}><div className={s.cardHead}><div><span className={s.micro}>NEXT BEST ACTION</span><h3>{weak[0]?'Repair '+weak[0].topic:'Run your diagnostic set'}</h3></div><span className={s.aiChip}>SMART</span></div><p>{weak[0]?'Your current accuracy here is '+weak[0].acc+'%. Do a focused revision block, then answer 10 questions before switching topics.':'Answer a few questions so the system can identify where your time is most valuable.'}</p><div className={s.actionSteps}><span><i>1</i>Review concept</span><span><i>2</i>10 MCQs</span><span><i>3</i>Check accuracy</span></div><button onClick={()=>setView(weak[0]?'revision':'practice')}>Start now →</button></article>
+  <section className={s.bentoCommand}>
+   <article className={s.nextAction}><div className={s.cardHead}><div><span className={s.micro}>NEXT BEST ACTION</span><h3>{weak[0]?'Repair '+weak[0].topic:'Run your diagnostic set'}</h3></div><span className={s.aiChip}>SMART</span></div><p>{weak[0]?'Your current accuracy here is '+weak[0].acc+'%. Revise the concept, then answer a focused 10-question set before changing topics.':'Answer a few questions so the system can identify where your time is most valuable.'}</p><div className={s.actionSteps}><span><i>1</i>Review concept</span><span><i>2</i>10 MCQs</span><span><i>3</i>Measure again</span></div><button onClick={()=>setView(weak[0]?'revision':'practice')}>Start now →</button></article>
+   <ExamCountdown date={p.examDate} setDate={setExamDate}/>
+   <WeeklyPulse activity={p.activity} target={p.weeklyTarget} setTarget={setWeeklyTarget}/>
    <ActivityHeatmap activity={p.activity}/>
   </section>
 
@@ -94,8 +94,10 @@ function Metric({icon,t,v,d,tone}:{icon:string;t:string;v:string;d:string;tone:s
 function Panel({title,badge,children}:{title:string;badge?:string;children:any}){return <section className={s.panel}><div className={s.panelHead}><h3>{title}</h3>{badge&&<span>{badge}</span>}</div>{children}</section>}
 function Priority({rows}:{rows:readonly (readonly [string,number])[]}){return <div className={s.priority}>{rows.map((r,i)=><div key={r[0]}><div className={s.rank}>{String(i+1).padStart(2,'0')}</div><div className={s.priorityMain}><span>{r[0]}</span><div><i style={{width:r[1]+'%'}}/></div></div><strong>{r[1]}</strong></div>)}</div>}
 
-function Planner({tasks,setTasks,weakTopic,activity,notes,setNotes,onFocusComplete}:{tasks:DailyTasks;setTasks:(x:DailyTasks)=>void;weakTopic?:string;activity:Record<string,number>;notes:string;setNotes:(x:string)=>void;onFocusComplete:()=>void}){
- return <><div className={s.sectionIntro}><div><span className={s.kicker}>TODAY · PLAN · EXECUTE</span><h2>A study day with structure.</h2><p>Finish the right work, not just more work.</p></div><div className={s.datePill}>{new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'})}</div></div><section className={s.plannerGrid}><DailyMission tasks={tasks} setTasks={setTasks} weakTopic={weakTopic}/><FocusTimer onComplete={onFocusComplete}/><ActivityHeatmap activity={activity}/><QuickNotes value={notes} onChange={setNotes}/></section></>
+function Planner({p,tasks,setTasks,weakTopic,syllabusPct,setNotes,onFocusComplete,setExamDate}:{p:Progress;tasks:DailyTasks;setTasks:(x:DailyTasks)=>void;weakTopic?:string;syllabusPct:number;setNotes:(x:string)=>void;onFocusComplete:()=>void;setExamDate:(x:string)=>void}){
+ return <><div className={s.sectionIntro}><div><span className={s.kicker}>TODAY · PLAN · EXECUTE</span><h2>A study day with structure.</h2><p>Finish the right work, not just more work.</p></div><div className={s.datePill}>{new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short'})}</div></div>
+ <section className={s.plannerGrid}><DailyMission tasks={tasks} setTasks={setTasks} weakTopic={weakTopic}/><FocusTimer onComplete={onFocusComplete}/><ExamCountdown date={p.examDate} setDate={setExamDate}/><QuickNotes value={p.notes} onChange={setNotes}/></section>
+ <section className={s.plannerLower}><SevenDayPlan weakTopic={weakTopic} syllabusPct={syllabusPct} reviewCount={p.review.length}/><DataVault payload={p}/></section></>
 }
 
 function Papers(){const[filter,setFilter]=useState<'All'|Kind>('All');return <><div className={s.sectionIntro}><div><span className={s.kicker}>ARCHIVE INTELLIGENCE</span><h2>Learn how HAS asks.</h2><p>Use papers to spot recurring themes and question style.</p></div><Tabs items={['All','GS','GSAT']} active={filter} onPick={x=>setFilter(x as any)}/></div><section className={s.papergrid}>{papers.map(p=><article key={p.year}><div className={s.paperTop}><div><small>{p.legacy?'LEGACY PAPER':'MODERN FORMAT'}</small><b>{p.year}</b></div><span>↗</span></div>{filter!=='GSAT'&&<p><span>General Studies</span><Status x={p.gs}/></p>}{filter!=='GS'&&<p><span>GSAT / Aptitude</span><Status x={p.gsat}/></p>}<a href={p.url} target="_blank">Open paper source</a></article>)}</section><section className={s.insight}><div>i</div><p><b>Archive integrity.</b> Unverified early-year papers remain clearly labeled rather than being replaced by guessed files.</p></section></>}
@@ -115,5 +117,5 @@ function Syllabus({done,setDone}:{done:string[];setDone:(x:string[])=>void}){con
 
 function RevisionLab({p,toggleBookmark,removeReview}:{p:Progress;toggleBookmark:(id:string)=>void;removeReview:(id:string)=>void}){const[tab,setTab]=useState<'Errors'|'Flashcards'|'Saved'>('Errors');return <><div className={s.sectionIntro}><div><span className={s.kicker}>SPACED REVIEW SYSTEM</span><h2>Turn mistakes into marks.</h2><p>Your wrong answers and saved questions become a reusable revision deck.</p></div><Tabs items={['Errors','Flashcards','Saved']} active={tab} onPick={x=>setTab(x as any)}/></div>{tab==='Errors'&&<ReviewQueue ids={p.review} bookmarks={p.bookmarks} onRemove={removeReview} onToggleBookmark={toggleBookmark}/>} {tab==='Flashcards'&&<Flashcards ids={p.bookmarks.length?p.bookmarks:p.review}/>} {tab==='Saved'&&<Bookmarks ids={p.bookmarks} onToggle={toggleBookmark}/>}</>}
 
-function Analytics({p,weak,streak}:{p:Progress;weak:{topic:string;acc:number;n:number}[];streak:number}){const best=p.mocks.length?Math.max(...p.mocks.map(x=>x.score)):0;return <><section className={s.metrics}><Metric icon="🔥" t="Current streak" v={streak+'d'} d="Consistency matters" tone="violet"/><Metric icon="✓" t="Overall accuracy" v={p.attempts?pct(p.attempts,p.correct)+'%':'—'} d="Practice performance" tone="cyan"/><Metric icon="◉" t="Mocks completed" v={String(p.mocks.length)} d="Recent 20 retained" tone="amber"/><Metric icon="↑" t="Best mock" v={p.mocks.length?best+'%':'—'} d="Negative-marking score" tone="green"/></section><section className={s.analyticsGrid}><Panel title="Weak-topic diagnosis" badge="FOCUS">{weak.length?weak.map(x=><div className={s.weak} key={x.topic}><div><span>{x.topic}</span><small>{x.n} attempts</small></div><div className={s.miniBar}><i style={{width:x.acc+'%'}}/></div><b>{x.acc}%</b></div>):<div className={s.empty}>Answer at least two questions in a topic to unlock diagnosis.</div>}</Panel><Panel title="Recent mock trend" badge="HISTORY">{p.mocks.length?p.mocks.slice(0,8).map(x=><div className={s.weak} key={x.date}><div><span>{x.kind}</span><small>{new Date(x.date).toLocaleDateString('en-IN')}</small></div><div className={s.miniBar}><i style={{width:x.score+'%'}}/></div><b>{x.score}%</b></div>):<div className={s.empty}>No submitted mocks yet.</div>}</Panel><ActivityHeatmap activity={p.activity}/></section></>}
+function Analytics({p,weak,streak,setWeeklyTarget}:{p:Progress;weak:{topic:string;acc:number;n:number}[];streak:number;setWeeklyTarget:(n:number)=>void}){const best=p.mocks.length?Math.max(...p.mocks.map(x=>x.score)):0;return <><section className={s.metrics}><Metric icon="🔥" t="Current streak" v={streak+'d'} d="Consistency matters" tone="violet"/><Metric icon="✓" t="Overall accuracy" v={p.attempts?pct(p.attempts,p.correct)+'%':'—'} d="Practice performance" tone="cyan"/><Metric icon="◉" t="Mocks completed" v={String(p.mocks.length)} d="Recent 20 retained" tone="amber"/><Metric icon="↑" t="Best mock" v={p.mocks.length?best+'%':'—'} d="Negative-marking score" tone="green"/></section><section className={s.analyticsGrid}><Panel title="Weak-topic diagnosis" badge="FOCUS">{weak.length?weak.map(x=><div className={s.weak} key={x.topic}><div><span>{x.topic}</span><small>{x.n} attempts</small></div><div className={s.miniBar}><i style={{width:x.acc+'%'}}/></div><b>{x.acc}%</b></div>):<div className={s.empty}>Answer at least two questions in a topic to unlock diagnosis.</div>}</Panel><Panel title="Recent mock trend" badge="HISTORY">{p.mocks.length?p.mocks.slice(0,8).map(x=><div className={s.weak} key={x.date}><div><span>{x.kind}</span><small>{new Date(x.date).toLocaleDateString('en-IN')}</small></div><div className={s.miniBar}><i style={{width:x.score+'%'}}/></div><b>{x.score}%</b></div>):<div className={s.empty}>No submitted mocks yet.</div>}</Panel><WeeklyPulse activity={p.activity} target={p.weeklyTarget} setTarget={setWeeklyTarget}/><MasteryMatrix topics={p.topics}/><ActivityHeatmap activity={p.activity}/></section></>}
 function Tabs({items,active,onPick}:{items:string[];active:string;onPick:(x:string)=>void}){return <div className={s.tabs}>{items.map(x=><button className={active===x?s.activeTab:''} onClick={()=>onPick(x)} key={x}>{x}</button>)}</div>}
