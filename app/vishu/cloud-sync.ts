@@ -128,6 +128,62 @@ export async function loadQuestionBank(): Promise<Q[]> {
   }).filter((q: Q) => q.o.length >= 2);
 }
 
+export type PyqBrowseQuestion = {
+  id: string;
+  year: number;
+  kind: 'GS' | 'GSAT';
+  number: number;
+  page: number | null;
+  text: string;
+  status: 'ocr_unverified' | 'scan_only';
+  sourceUrl: string;
+};
+
+export async function loadPyqQuestions(
+  year: number,
+  kind: 'GS' | 'GSAT'
+): Promise<PyqBrowseQuestion[]> {
+  const exam = await getHasExam();
+  if (!exam) return [];
+
+  const { data: section, error: sectionError } = await supabase
+    .from('exam_sections')
+    .select('id')
+    .eq('exam_id', exam.id)
+    .eq('stage', 'prelims')
+    .eq('code', kind)
+    .maybeSingle();
+
+  if (sectionError || !section) return [];
+
+  const { data, error } = await supabase
+    .from('exam_questions')
+    .select(
+      'external_key,source_year,source_question_number,source_page,question_text,source_url,verification_status'
+    )
+    .eq('exam_id', exam.id)
+    .eq('section_id', section.id)
+    .eq('source_year', year)
+    .like('external_key', 'pyq-%')
+    .order('source_question_number', { ascending: true });
+
+  if (error) return [];
+
+  return (data || []).map((row: any) => ({
+    id: String(row.external_key),
+    year: Number(row.source_year),
+    kind,
+    number: Number(row.source_question_number || 0),
+    page: row.source_page == null ? null : Number(row.source_page),
+    text: String(row.question_text || ''),
+    status:
+      row.verification_status === 'ocr_unverified'
+        ? 'ocr_unverified'
+        : 'scan_only',
+    sourceUrl: String(row.source_url || ''),
+  }));
+}
+
 export async function signInStudyUser(email: string, password: string) {
   if (!isSupabaseConfigured) {
     return {
