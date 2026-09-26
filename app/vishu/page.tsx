@@ -1,0 +1,60 @@
+'use client';
+import {FormEvent,useEffect,useMemo,useState} from 'react';
+import s from './vishu.module.css';
+import {official,papers,questions,prelim,mains,gsPriority,gsatPriority,type Kind,type Q} from './data';
+
+const HASH='1bb31dbdb4c1c4ebc447edad08169518435f8a40b6d0985b943a5ddf26202ce0';
+const AUTH='vishu-auth-v1', STORE='vishu-progress-v1';
+type View='dashboard'|'papers'|'practice'|'mock'|'syllabus'|'analytics';
+type Progress={attempts:number;correct:number;topics:Record<string,{a:number;c:number}>;done:string[];mocks:{date:string;kind:string;score:number}[]};
+const blank:Progress={attempts:0,correct:0,topics:{},done:[],mocks:[]};
+async function hash(v:string){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+const pct=(a:number,b:number)=>a?Math.round(b/a*100):0;
+
+export default function Vishu(){
+ const[ready,setReady]=useState(false),[auth,setAuth]=useState(false),[view,setView]=useState<View>('dashboard');
+ const[p,setP]=useState<Progress>(blank);
+ useEffect(()=>{setAuth(localStorage.getItem(AUTH)===HASH);try{setP({...blank,...JSON.parse(localStorage.getItem(STORE)||'{}')})}catch{}setReady(true)},[]);
+ useEffect(()=>{if(ready)localStorage.setItem(STORE,JSON.stringify(p))},[p,ready]);
+ if(!ready)return <main className={s.loading}>Preparing HAS Command Center…</main>;
+ if(!auth)return <Login onOk={()=>setAuth(true)}/>;
+ const acc=pct(p.attempts,p.correct),all=[...prelim,...mains],syll=Math.round(p.done.length/all.length*100);
+ const weak=Object.entries(p.topics).filter(([,v])=>v.a>=2).map(([topic,v])=>({topic,acc:pct(v.a,v.c),n:v.a})).sort((a,b)=>a.acc-b.acc);
+ return <div className={s.shell}>
+  <aside className={s.side}><div className={s.brand}><b>H</b><span><strong>HAS Command</strong><small>Vishu Study OS</small></span></div>
+   <nav>{([['dashboard','Command Center'],['papers','Previous Papers'],['practice','Smart Practice'],['mock','Mock Exam'],['syllabus','Syllabus Tracker'],['analytics','Analytics']] as [View,string][]).map(x=><button className={view===x[0]?s.active:''} onClick={()=>setView(x[0])} key={x[0]}>{x[1]}</button>)}</nav>
+   <div className={s.sidefoot}><small>Syllabus {syll}%</small><div className={s.bar}><i style={{width:syll+'%'}}/></div><button onClick={()=>{localStorage.removeItem(AUTH);setAuth(false)}}>Lock workspace</button></div>
+  </aside>
+  <main className={s.main}><header><div><small>HIMACHAL PRADESH ADMINISTRATIVE SERVICE</small><h1>{title(view)}</h1></div><a href={official.home} target="_blank">Official HPPSC ↗</a></header>
+   {view==='dashboard'&&<Dashboard acc={acc} attempts={p.attempts} syll={syll} weak={weak}/>}
+   {view==='papers'&&<Papers/>}
+   {view==='practice'&&<Practice onAnswer={(q,ok)=>setP(x=>{const t=x.topics[q.topic]||{a:0,c:0};return{...x,attempts:x.attempts+1,correct:x.correct+(ok?1:0),topics:{...x.topics,[q.topic]:{a:t.a+1,c:t.c+(ok?1:0)}}}})}/>}
+   {view==='mock'&&<Mock onDone={(kind,score)=>setP(x=>({...x,mocks:[{date:new Date().toISOString(),kind,score},...x.mocks].slice(0,20)}))}/>}
+   {view==='syllabus'&&<Syllabus done={p.done} setDone={done=>setP(x=>({...x,done}))}/>}
+   {view==='analytics'&&<Analytics p={p} weak={weak}/>}
+  </main>
+ </div>
+}
+function title(v:View){return({dashboard:'Command Center',papers:'Previous Paper Library',practice:'Smart Practice',mock:'HAS Mock Exam',syllabus:'Syllabus Tracker',analytics:'Performance Analytics'})[v]}
+function Login({onOk}:{onOk:()=>void}){const[e,setE]=useState(''),[pw,setPw]=useState(''),[err,setErr]=useState('');
+ async function submit(ev:FormEvent){ev.preventDefault();if(await hash(e.trim().toLowerCase()+'|'+pw)===HASH){localStorage.setItem(AUTH,HASH);onOk()}else setErr('Incorrect login details.')}
+ return <main className={s.login}><form onSubmit={submit}><div className={s.logo}>H</div><small>PRIVATE STUDY WORKSPACE</small><h1>HAS Command</h1><p>Previous papers, adaptive practice, mocks and syllabus intelligence in one place.</p><label>Email<input type="email" value={e} onChange={x=>setE(x.target.value)} required/></label><label>Password<input type="password" value={pw} onChange={x=>setPw(x.target.value)} required/></label>{err&&<b className={s.error}>{err}</b>}<button>Enter workspace</button><em>Credentials are checked locally; the password is not stored in plain text.</em></form></main>}
+function Dashboard({acc,attempts,syll,weak}:{acc:number;attempts:number;syll:number;weak:{topic:string;acc:number;n:number}[]}){return <><section className={s.hero}><div><small>TODAY'S MISSION</small><h2>Build GS depth. Keep GSAT safely above qualifying range.</h2><p>The modern HPAS prelim has separate General Studies and Aptitude papers. Use the pattern map to prioritize recurring areas while keeping Paper II strong.</p></div><div className={s.ring}><b>{Math.round((acc+syll)/2)}%</b><span>readiness signal</span></div></section>
+ <section className={s.metrics}><Card t="Practice accuracy" v={attempts?acc+'%':'—'} d={attempts+' answered'}/><Card t="Syllabus complete" v={syll+'%'} d="Prelims + Mains"/><Card t="Weakest area" v={weak[0]?.acc+'%'||'—'} d={weak[0]?.topic||'Take a diagnostic set'}/><Card t="Paper coverage" v="2000–2025" d="Legacy + modern archive"/></section>
+ <section className={s.grid2}><Panel title="GS priority map"><Priority rows={gsPriority}/></Panel><Panel title="GSAT priority map"><Priority rows={gsatPriority}/></Panel></section>
+ <section className={s.note}><b>Exam-history note</b><p>The two-paper GS + Aptitude prelim structure starts from 2010 in this archive. Earlier entries are treated as legacy material, not mislabeled as GSAT papers. Priority scores are study guidance, not official marks weightage.</p></section></>}
+function Card({t,v,d}:{t:string;v:string;d:string}){return <div className={s.card}><small>{t}</small><b>{v}</b><span>{d}</span></div>}
+function Panel({title,children}:{title:string;children:any}){return <section className={s.panel}><h3>{title}</h3>{children}</section>}
+function Priority({rows}:{rows:readonly (readonly [string,number])[]}){return <div className={s.priority}>{rows.map((r,i)=><div key={r[0]}><b>{i+1}</b><span>{r[0]}<i><em style={{width:r[1]+'%'}}/></i></span><strong>{r[1]}</strong></div>)}</div>}
+function Papers(){const[filter,setFilter]=useState<'All'|Kind>('All');return <><div className={s.tabs}>{['All','GS','GSAT'].map(x=><button onClick={()=>setFilter(x as any)} className={filter===x?s.activeTab:''} key={x}>{x}</button>)}</div><section className={s.papergrid}>{papers.map(p=><article key={p.year}><div><b>{p.year}</b>{p.legacy&&<small>Legacy format</small>}</div>{filter!=='GSAT'&&<p>GS <Status x={p.gs}/></p>}{filter!=='GS'&&<p>GSAT <Status x={p.gsat}/></p>}<a href={p.url} target="_blank">Open source ↗</a></article>)}</section><div className={s.note}><b>Archive integrity</b><p>Where a complete early-year paper could not be verified online, it is marked “Not verified” instead of inventing a download. Accessible archive links remain available for research.</p></div></>}
+function Status({x}:{x:string}){return <span className={x==='Verified'?s.good:x==='N/A'?s.muted:s.warn}>{x}</span>}
+function Practice({onAnswer}:{onAnswer:(q:Q,ok:boolean)=>void}){const[kind,setKind]=useState<Kind>('GS'),[idx,setIdx]=useState(0),[pick,setPick]=useState<number|null>(null),[answered,setAnswered]=useState(false);const qs=questions.filter(x=>x.kind===kind),q=qs[idx%qs.length];
+ const choose=(i:number)=>{if(answered)return;setPick(i);setAnswered(true);onAnswer(q,i===q.a)};
+ return <><div className={s.tabs}>{(['GS','GSAT'] as Kind[]).map(x=><button className={kind===x?s.activeTab:''} onClick={()=>{setKind(x);setIdx(0);setAnswered(false);setPick(null)}} key={x}>{x}</button>)}</div><section className={s.quiz}><div className={s.qmeta}><span>{q.topic}</span><small>{q.year?'PYQ theme · '+q.year:'Syllabus practice'}</small></div><h2>{q.q}</h2><div className={s.options}>{q.o.map((o,i)=><button key={o} onClick={()=>choose(i)} className={answered?(i===q.a?s.correct:i===pick?s.wrong:''):''}><b>{String.fromCharCode(65+i)}</b>{o}</button>)}</div>{answered&&<div className={s.explain}><h3>{pick===q.a?'✓ Correct':'✕ Not quite'}</h3><p>{q.why}</p><b>Exam takeaway</b><p>{q.tip}</p><button onClick={()=>{setIdx(x=>x+1);setPick(null);setAnswered(false)}}>Next question →</button></div>}</section></>}
+function Mock({onDone}:{onDone:(k:string,s:number)=>void}){const[kind,setKind]=useState<'GS'|'GSAT'|'Mixed'>('Mixed'),[started,setStarted]=useState(false),[set,setSet]=useState<Q[]>([]),[ans,setAns]=useState<Record<string,number>>({}),[result,setResult]=useState<number|null>(null);
+ const start=()=>{let pool=kind==='Mixed'?questions:questions.filter(q=>q.kind===kind);setSet([...pool].sort(()=>Math.random()-.5).slice(0,Math.min(10,pool.length)));setAns({});setResult(null);setStarted(true)};
+ const finish=()=>{const correct=set.filter(q=>ans[q.id]===q.a).length,wrong=set.filter(q=>ans[q.id]!=null&&ans[q.id]!==q.a).length;const raw=correct*2-wrong*(2/3),score=Math.max(0,Math.round(raw/(set.length*2)*100));setResult(score);onDone(kind,score)};
+ if(!started)return <section className={s.quiz}><h2>Create a syllabus-aligned mock</h2><p>Questions come only from the HAS prelim syllabus bank. Scoring uses +2 for correct and a one-third mark penalty for wrong answers.</p><div className={s.tabs}>{['GS','GSAT','Mixed'].map(x=><button className={kind===x?s.activeTab:''} onClick={()=>setKind(x as any)} key={x}>{x}</button>)}</div><button className={s.primary} onClick={start}>Start mock</button></section>;
+ return <section className={s.quiz}>{result!==null?<div className={s.result}><b>{result}%</b><h2>Mock complete</h2><button onClick={()=>setStarted(false)}>Create another</button></div>:<><div className={s.mockhead}><b>{kind} Mock</b><span>{Object.keys(ans).length}/{set.length} answered</span></div>{set.map((q,n)=><div className={s.mockq} key={q.id}><h3>{n+1}. {q.q}</h3>{q.o.map((o,i)=><label key={o}><input type="radio" name={q.id} checked={ans[q.id]===i} onChange={()=>setAns(a=>({...a,[q.id]:i}))}/>{o}</label>)}</div>)}<button className={s.primary} onClick={finish}>Submit exam</button></>}</section>}
+function Syllabus({done,setDone}:{done:string[];setDone:(x:string[])=>void}){const[tab,setTab]=useState<'Prelims'|'Mains'>('Prelims'),list=tab==='Prelims'?prelim:mains;return <><div className={s.tabs}><button className={tab==='Prelims'?s.activeTab:''} onClick={()=>setTab('Prelims')}>Preliminary</button><button className={tab==='Mains'?s.activeTab:''} onClick={()=>setTab('Mains')}>Main</button></div><section className={s.panel}><div className={s.paneltop}><h3>{tab} syllabus</h3><a href={tab==='Mains'?official.mains:official.home} target="_blank">Official source ↗</a></div><div className={s.checks}>{list.map(x=><label key={x[0]}><input type="checkbox" checked={done.includes(x[0])} onChange={e=>setDone(e.target.checked?[...done,x[0]]:done.filter(i=>i!==x[0]))}/><span><b>{x[1]} · {x[3]}</b>{x[2]}</span></label>)}</div></section></>}
+function Analytics({p,weak}:{p:Progress;weak:{topic:string;acc:number;n:number}[]}){return <><section className={s.metrics}><Card t="Questions attempted" v={String(p.attempts)} d="Lifetime on this device"/><Card t="Overall accuracy" v={p.attempts?pct(p.attempts,p.correct)+'%':'—'} d="Practice answers"/><Card t="Mocks completed" v={String(p.mocks.length)} d="Recent 20 retained"/><Card t="Best mock" v={p.mocks.length?Math.max(...p.mocks.map(x=>x.score))+'%':'—'} d="Negative-marking score"/></section><section className={s.grid2}><Panel title="Weak-topic diagnosis">{weak.length?weak.map(x=><div className={s.weak} key={x.topic}><span>{x.topic}</span><b>{x.acc}%</b><small>{x.n} attempts</small></div>):<p>Answer at least two questions in a topic to unlock diagnosis.</p>}</Panel><Panel title="Recent mocks">{p.mocks.length?p.mocks.slice(0,8).map(x=><div className={s.weak} key={x.date}><span>{x.kind}</span><b>{x.score}%</b><small>{new Date(x.date).toLocaleDateString('en-IN')}</small></div>):<p>No submitted mocks yet.</p>}</Panel></section></>}
