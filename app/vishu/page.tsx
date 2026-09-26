@@ -42,7 +42,7 @@ export default function Vishu(){
    <div className={s.navLabel}>WORKSPACE</div>
    <nav>{nav.map(([id,label,icon])=><button key={id} className={view===id?s.active:''} onClick={()=>setView(id)}><span>{icon}</span><b>{label}</b>{view===id&&<i/>}</button>)}</nav>
    <div className={s.sideCard}><div><span>Overall progress</span><b>{syll}%</b></div><div className={s.bar}><i style={{width:syll+'%'}}/></div><small>{p.done.length}/{all.length} syllabus blocks complete</small></div>
-   <button className={s.lock} onClick={async()=>{await supabase.auth.signOut();setAuth(false)}}>↗ Lock workspace</button>
+   <button className={s.lock} onClick={async()=>{await supabase.auth.signOut();setAuth(false)}}>↗ Logout</button>
   </aside>
 
   <main className={s.main}>
