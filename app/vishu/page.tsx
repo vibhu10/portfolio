@@ -29,7 +29,7 @@ export default function Vishu(){
  useEffect(()=>{if(ready)localStorage.setItem(STORE,JSON.stringify(p))},[p,ready]);
  useEffect(()=>{if(!ready||!auth)return;const timer=setTimeout(()=>{void saveSettings(p.examDate,p.weeklyTarget,p.notes)},600);return()=>clearTimeout(timer)},[p.examDate,p.weeklyTarget,p.notes,ready,auth]);
  if(!ready)return <main className={s.loading}><div className={s.loader}/><span>Building your study command center…</span></main>;
- if(!auth)return <Login onOk={()=>setAuth(true)}/>;
+ if(!auth)return <Login onOk={async()=>{const cloud=await loadHasProgress();if(cloud)setP(x=>mergeProgress(x,cloud));setAuth(true)}}/>;
 
  const acc=pct(p.attempts,p.correct),all=[...prelim,...mains],syll=Math.round(p.done.length/all.length*100);
  const weak=Object.entries(p.topics).filter(([,v])=>v.a>=2).map(([topic,v])=>({topic,acc:pct(v.a,v.c),n:v.a})).sort((a,b)=>a.acc-b.acc);
@@ -68,9 +68,9 @@ export default function Vishu(){
 function title(v:View){return({dashboard:'Command Center',planner:'Study Planner',papers:'Previous Paper Library',practice:'Smart Practice',mock:'HAS Mock Exam',syllabus:'Syllabus Tracker',revision:'Revision Lab',analytics:'Performance Analytics'})[v]}
 function calcStreak(activity:Record<string,number>){let d=new Date(),n=0;if(!(activity[localKey(d)]>0))d.setDate(d.getDate()-1);for(let i=0;i<365;i++){if(activity[localKey(d)]>0){n++;d.setDate(d.getDate()-1)}else break}return n}
 
-function Login({onOk}:{onOk:()=>void}){
+function Login({onOk}:{onOk:()=>void|Promise<void>}){
  const[e,setE]=useState(''),[pw,setPw]=useState(''),[err,setErr]=useState('');
- async function submit(ev:FormEvent){ev.preventDefault();setErr('');const {session,error}=await signInStudyUser(e.trim().toLowerCase(),pw);if(error||!session){setErr('Incorrect email or password.');return}onOk()}
+ async function submit(ev:FormEvent){ev.preventDefault();setErr('');const {session,error}=await signInStudyUser(e.trim().toLowerCase(),pw);if(error||!session){setErr('Incorrect email or password.');return}await onOk()}
  return <main className={s.login}><div className={s.loginGlow}/><div className={s.loginNoise}/><section className={s.loginShell}>
   <div className={s.loginIntro}><span className={s.kicker}>HAS PREPARATION · REIMAGINED</span><h1>Your exam prep.<br/><em>One intelligent system.</em></h1><p>Practice, plan, revise, track mistakes and measure consistency without jumping between apps.</p><div className={s.loginStats}><div><b>26</b><span>Years mapped</span></div><div><b>35d</b><span>Study heatmap</span></div><div><b>∞</b><span>Revision cycles</span></div></div></div>
   <form onSubmit={submit} className={s.loginCard}><div className={s.logo}>H</div><small>VISHU STUDY OS</small><h2>Enter command center</h2><p>Your private HAS preparation workspace.</p><label>Email<input type="email" value={e} onChange={x=>setE(x.target.value)} placeholder="you@example.com" required/></label><label>Password<input type="password" value={pw} onChange={x=>setPw(x.target.value)} placeholder="••••••••••" required/></label>{err&&<b className={s.error}>{err}</b>}<button>Launch workspace <span>→</span></button><em>Supabase secured authentication · local progress cache enabled</em></form>
