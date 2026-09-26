@@ -43,22 +43,22 @@ export function QuickNotes({value,onChange}:{value:string;onChange:(x:string)=>v
  return <section className={s.notesCard}><div className={s.cardHead}><div><span className={s.micro}>QUICK NOTES</span><h3>Brain dump → revision material</h3></div><span className={s.wordCount}>{count} words</span></div><textarea value={value} onChange={e=>onChange(e.target.value)} placeholder="Write facts, mnemonics, mistakes, doubts, or tomorrow’s targets…"/><small>Autosaved to cloud with a local backup.</small></section>
 }
 
-export function ReviewQueue({ids,bookmarks,onRemove,onToggleBookmark}:{ids:string[];bookmarks:string[];onRemove:(id:string)=>void;onToggleBookmark:(id:string)=>void}){
- const list=ids.map(id=>questions.find(q=>q.id===id)).filter(Boolean) as Q[];
+export function ReviewQueue({ids,bookmarks,onRemove,onToggleBookmark,bank=questions}:{ids:string[];bookmarks:string[];onRemove:(id:string)=>void;onToggleBookmark:(id:string)=>void;bank?:Q[]}){
+ const list=ids.map(id=>bank.find(q=>q.id===id)).filter(Boolean) as Q[];
  return <section className={s.reviewPanel}><div className={s.cardHead}><div><span className={s.micro}>ERROR BOOK</span><h3>Questions that deserve another look</h3></div><span className={s.queueBadge}>{list.length} queued</span></div>
   {list.length? <div className={s.reviewList}>{list.map(q=><article key={q.id}><div><span>{q.kind} · {q.topic}</span><h4>{q.q}</h4><p>{q.why}</p></div><div className={s.reviewActions}><button onClick={()=>onToggleBookmark(q.id)}>{bookmarks.includes(q.id)?'★ Saved':'☆ Save'}</button><button onClick={()=>onRemove(q.id)}>✓ Reviewed</button></div></article>)}</div>:<div className={s.emptyState}><i>✓</i><b>Your error book is clear</b><p>Wrong practice answers will automatically appear here.</p></div>}
  </section>
 }
 
-export function Bookmarks({ids,onToggle}:{ids:string[];onToggle:(id:string)=>void}){
- const list=ids.map(id=>questions.find(q=>q.id===id)).filter(Boolean) as Q[];
+export function Bookmarks({ids,onToggle,bank=questions}:{ids:string[];onToggle:(id:string)=>void;bank?:Q[]}){
+ const list=ids.map(id=>bank.find(q=>q.id===id)).filter(Boolean) as Q[];
  return <section className={s.reviewPanel}><div className={s.cardHead}><div><span className={s.micro}>SAVED</span><h3>Bookmarked questions</h3></div><span className={s.queueBadge}>{list.length}</span></div>
   {list.length?<div className={s.savedGrid}>{list.map(q=><article key={q.id}><span>{q.topic}</span><h4>{q.q}</h4><p>{q.tip}</p><button onClick={()=>onToggle(q.id)}>Remove bookmark</button></article>)}</div>:<div className={s.emptyState}><i>☆</i><b>No bookmarks yet</b><p>Save high-value questions from Smart Practice.</p></div>}
  </section>
 }
 
-export function Flashcards({ids}:{ids:string[]}){
- const pool=(ids.length?ids.map(id=>questions.find(q=>q.id===id)).filter(Boolean):questions) as Q[];
+export function Flashcards({ids,bank=questions}:{ids:string[];bank?:Q[]}){
+ const pool=(ids.length?ids.map(id=>bank.find(q=>q.id===id)).filter(Boolean):bank) as Q[];
  const[index,setIndex]=useState(0),[flip,setFlip]=useState(false);
  const q=pool[index%pool.length];
  if(!q)return null;
