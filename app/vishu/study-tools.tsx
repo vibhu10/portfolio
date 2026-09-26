@@ -40,7 +40,7 @@ export function ActivityHeatmap({activity}:{activity:Record<string,number>}){
 export function QuickNotes({value,onChange}:{value:string;onChange:(x:string)=>void}){
  const[count,setCount]=useState(0);
  useEffect(()=>setCount(value.trim()?value.trim().split(/\s+/).length:0),[value]);
- return <section className={s.notesCard}><div className={s.cardHead}><div><span className={s.micro}>QUICK NOTES</span><h3>Brain dump → revision material</h3></div><span className={s.wordCount}>{count} words</span></div><textarea value={value} onChange={e=>onChange(e.target.value)} placeholder="Write facts, mnemonics, mistakes, doubts, or tomorrow’s targets…"/><small>Autosaved on this device.</small></section>
+ return <section className={s.notesCard}><div className={s.cardHead}><div><span className={s.micro}>QUICK NOTES</span><h3>Brain dump → revision material</h3></div><span className={s.wordCount}>{count} words</span></div><textarea value={value} onChange={e=>onChange(e.target.value)} placeholder="Write facts, mnemonics, mistakes, doubts, or tomorrow’s targets…"/><small>Autosaved to cloud with a local backup.</small></section>
 }
 
 export function ReviewQueue({ids,bookmarks,onRemove,onToggleBookmark}:{ids:string[];bookmarks:string[];onRemove:(id:string)=>void;onToggleBookmark:(id:string)=>void}){
